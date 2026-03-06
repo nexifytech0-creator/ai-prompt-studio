@@ -4,45 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Prompt Studio</title>
-<!-- Firebase SDKs -->
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-  import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, query, orderBy, limit, writeBatch }
-    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-  // ── Firebase config — replace with your own project ──
-  const firebaseConfig = {
-    apiKey:            "AIzaSyCd67VDP6ZDMvyosw06KCN0cSZ5t2DiR74",
-    authDomain:        "ai-prompt-studio-5a49f.firebaseapp.com",
-    projectId:         "ai-prompt-studio-5a49f",
-    storageBucket:     "ai-prompt-studio-5a49f.firebasestorage.app",
-    messagingSenderId: "26276457368",
-    appId:             "1:26276457368:web:29bfc8a45b59711c5259ed",
-    measurementId:     "G-4BLQWPM3VK"
-  };
-
-  const app      = initializeApp(firebaseConfig);
-  const auth     = getAuth(app);
-  const db       = getFirestore(app);
-  const provider = new GoogleAuthProvider();
-
-  // Expose to global scope for non-module JS
-  window._fbAuth     = auth;
-  window._fbDb       = db;
-  window._fbProvider = provider;
-  window._fbFns = {
-    signInWithPopup, signOut, onAuthStateChanged,
-    collection, doc, setDoc, getDocs, deleteDoc, query, orderBy, limit, writeBatch
-  };
-
-  // Auth state listener
-  onAuthStateChanged(auth, user => {
-    window._fbUser = user || null;
-    if(window.onAuthReady) window.onAuthReady(user);
-  });
-</script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -392,57 +353,6 @@
   .rb-no  { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
   .rb-no:hover { border-color: rgba(124,106,247,.3); color: var(--accent2); }
 
-  /* ── AUTH UI ── */
-  .auth-btn {
-    position:absolute; top:0; right:0;
-    display:flex; align-items:center; gap:8px;
-    padding:7px 14px; border-radius:11px;
-    background:var(--surface2); border:1px solid var(--border);
-    color:var(--text-dim); font-family:var(--sans); font-size:11px; font-weight:700;
-    cursor:pointer; transition:all .2s; letter-spacing:.04em; z-index:10;
-  }
-  .auth-btn:hover { border-color:rgba(124,106,247,.45); color:var(--accent2); }
-  .auth-btn.signed-in { background:var(--accent-dim); border-color:rgba(124,106,247,.3); color:var(--accent2); }
-
-  .auth-avatar {
-    width:24px; height:24px; border-radius:50%;
-    background:var(--accent); display:flex; align-items:center; justify-content:center;
-    font-size:11px; font-weight:700; color:#fff; overflow:hidden; flex-shrink:0;
-  }
-  .auth-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
-
-  /* dropdown */
-  .auth-dropdown {
-    position:absolute; top:calc(100% + 8px); right:0; min-width:220px;
-    background:var(--surface); border:1px solid rgba(124,106,247,.25);
-    border-radius:14px; padding:8px; box-shadow:0 16px 48px rgba(0,0,0,.6);
-    z-index:200; display:none; animation:fadeUp .15s ease;
-  }
-  .auth-dropdown.open { display:block; }
-  .auth-user-info {
-    padding:10px 12px 12px; border-bottom:1px solid var(--border); margin-bottom:6px;
-  }
-  .auth-user-name { font-size:13px; font-weight:700; color:var(--text); margin-bottom:2px; }
-  .auth-user-email { font-size:10px; color:var(--text-muted); font-family:var(--mono); }
-  .auth-menu-item {
-    width:100%; padding:9px 12px; border-radius:9px; border:none;
-    background:transparent; color:var(--text-dim); font-family:var(--sans);
-    font-size:12px; font-weight:600; cursor:pointer; text-align:left;
-    display:flex; align-items:center; gap:8px; transition:all .15s;
-  }
-  .auth-menu-item:hover { background:var(--surface2); color:var(--text); }
-  .auth-menu-item.danger { color:var(--error); }
-  .auth-menu-item.danger:hover { background:rgba(248,113,113,.08); }
-
-  /* firebase config notice */
-  .fb-notice {
-    position:fixed; top:16px; left:50%; transform:translateX(-50%);
-    background:var(--surface); border:1px solid rgba(245,158,11,.35);
-    border-radius:12px; padding:12px 18px; font-size:12px; color:var(--img-color);
-    font-family:var(--mono); z-index:999; max-width:480px; text-align:center;
-    box-shadow:0 8px 32px rgba(0,0,0,.5); display:none;
-    animation:fadeUp .2s ease;
-  }
   ::-webkit-scrollbar{width:5px;height:5px}
   ::-webkit-scrollbar-thumb{background:var(--text-muted);border-radius:10px}
 
@@ -472,48 +382,6 @@
                background:var(--accent-dim);border:1px solid rgba(124,106,247,.3);
                color:var(--accent2);font-size:9px;font-weight:700;">0</span>
     </button>
-
-    <!-- Auth button — top right -->
-    <div style="position:absolute;top:0;right:0;" id="auth-wrap">
-      <!-- Not signed in -->
-      <button id="auth-signin-btn" class="auth-btn" onclick="authSignIn()">
-        <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
-          <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-          <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
-          <path d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
-          <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z" fill="#EA4335"/>
-        </svg>
-        Google দিয়ে Login
-      </button>
-
-      <!-- Signed in -->
-      <div id="auth-profile-wrap" style="display:none;position:relative;">
-        <button class="auth-btn signed-in" onclick="toggleAuthDropdown()" id="auth-profile-btn">
-          <div class="auth-avatar" id="auth-avatar">U</div>
-          <span id="auth-display-name">User</span>
-          <span style="font-size:10px;opacity:.6;">▼</span>
-        </button>
-        <div class="auth-dropdown" id="auth-dropdown">
-          <div class="auth-user-info">
-            <div class="auth-user-name" id="auth-full-name">—</div>
-            <div class="auth-user-email" id="auth-email">—</div>
-          </div>
-          <button class="auth-menu-item" onclick="toggleHistoryPanel();toggleAuthDropdown()">
-            🕓 My History
-          </button>
-          <button class="auth-menu-item danger" onclick="authSignOut()">
-            ↩ Sign Out
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Firebase config notice -->
-    <div class="fb-notice" id="fb-notice">
-      ⚠️ Firebase config প্রয়োজন — <code>firebaseConfig</code> আপনার project-এর key দিয়ে replace করুন।
-      <button onclick="this.parentElement.style.display='none'" style="margin-left:10px;background:transparent;border:none;color:inherit;cursor:pointer;font-size:14px;">✕</button>
-    </div>
-
     <div class="badge">⚡ Powered by Claude AI</div>
     <h1>AI PROMPT STUDIO</h1>
     <p class="subtitle">Script → Image Prompt + Video Prompt — প্রতিটি সিন আলাদাভাবে</p>
@@ -1175,63 +1043,55 @@ ${genCh ? 'List all characters with full visual consistency prompts.' : '"charac
 ${genVO ? 'Write complete formatted voiceover script.' : '"voiceoverScript":""'}
 Return ONLY: {"characters":[{"name":"","description":"","consistencyPrompt":""}],"voiceoverScript":""}`;
 
-  const callApi = (sys, userContent, maxTok) =>
-    fetch('https://api.anthropic.com/v1/messages', {
+  // ── Claude.ai Artifact API (window.claude) ──
+  const callClaude = async (sys, msgContent) => {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
-        max_tokens: maxTok,
+        max_tokens: 8000,
         system: sys,
-        messages: [{ role:'user', content: userContent }]
+        messages: [{ role: 'user', content: msgContent }]
       })
     });
+    if (!response.ok) {
+      const t = await response.text();
+      throw new Error('API Error ' + response.status + ': ' + t.slice(0, 300));
+    }
+    const j = await response.json();
+    if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));
+    return (j.content || []).map(c => c.text || '').join('');
+  };
 
-  const sceneContent = [
-    ...refBlock,
-    { type:'text', text: SCENE_USER }
-  ];
+  const extractJSON = (raw) => {
+    const clean = raw.replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'').trim();
+    const m = clean.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('JSON পাওয়া যায়নি। আবার চেষ্টা করুন।');
+    return JSON.parse(m[0]);
+  };
 
-  // Only fire extras call if needed
+  const sceneContent = [...refBlock, { type:'text', text: SCENE_USER }];
   const needExtras = genCh || genVO;
 
   try {
-    // Fire both calls in parallel
-    const promises = [ callApi(SCENE_SYS, sceneContent, 6000) ];
-    if (needExtras) promises.push( callApi(EXTRA_SYS, [{ type:'text', text: EXTRA_USER }], 2000) );
+    setLoading(true, `🎬 ${scenes}টি scene তৈরি হচ্ছে...`);
 
-    setLoading(true, `🎬 ${scenes}টি scene তৈরি হচ্ছে${needExtras ? ' · চরিত্র ও VO' : ''}...`);
-
-    const responses = await Promise.all(promises);
-
-    // Check HTTP errors
-    for (let i = 0; i < responses.length; i++) {
-      if (!responses[i].ok) {
-        const t = await responses[i].text();
-        throw new Error('API Error ' + responses[i].status + ': ' + t.slice(0, 200));
-      }
+    // Run both calls in parallel
+    const promises = [ callClaude(SCENE_SYS, sceneContent) ];
+    if (needExtras) {
+      promises.push( callClaude(EXTRA_SYS, [{ type:'text', text: EXTRA_USER }]) );
     }
 
-    const jsons = await Promise.all(responses.map(r => r.json()));
-    for (const j of jsons) {
-      if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));
-    }
-
+    const results = await Promise.all(promises);
     setLoading(true, '✅ ফলাফল সাজানো হচ্ছে...');
 
-    const extract = (j) => {
-      const raw = (j.content || []).map(c => c.text || '').join('');
-      const m = raw.replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'').trim().match(/\{[\s\S]*\}/);
-      if (!m) throw new Error('JSON খুঁজে পাওয়া যায়নি।');
-      return JSON.parse(m[0]);
-    };
-
-    const sceneData  = extract(jsons[0]);
-    const extraData  = needExtras ? extract(jsons[1]) : {};
+    const sceneData = extractJSON(results[0]);
+    const extraData = needExtras ? extractJSON(results[1]) : {};
 
     data = {
-      scenes:    sceneData.scenes    || [],
-      chars:     extraData.characters || [],
+      scenes:    sceneData.scenes     || [],
+      chars:     extraData.characters  || [],
       voiceover: extraData.voiceoverScript || ''
     };
 
@@ -1257,7 +1117,8 @@ Return ONLY: {"characters":[{"name":"","description":"","consistencyPrompt":""}]
     render();
     setLoading(false);
   } catch(err) {
-    showErr('❌ ' + err.message);
+    console.error('Generate error:', err);
+    showErr('❌ ' + (err.message || String(err)));
     setLoading(false);
   }
 }
@@ -1421,6 +1282,8 @@ function copyVO(){
 function showErr(msg){
   const e = document.getElementById('errbox');
   e.style.display = msg ? '' : 'none';
+  e.style.whiteSpace = 'pre-wrap';
+  e.style.wordBreak = 'break-all';
   e.textContent = msg;
 }
 function setLoading(on, msg=''){
@@ -1437,81 +1300,6 @@ function escAttr(s){ return s.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 
 
-// ─── GOOGLE AUTH ─────────────────────────────────
-let authDropdownOpen = false;
-let _authReady = false;
-
-window.onAuthReady = async function(user){
-  _authReady = true;
-  if(user){
-    // Update UI — signed in
-    document.getElementById('auth-signin-btn').style.display  = 'none';
-    document.getElementById('auth-profile-wrap').style.display = '';
-    document.getElementById('auth-display-name').textContent  = user.displayName?.split(' ')[0] || 'User';
-    document.getElementById('auth-full-name').textContent     = user.displayName || 'User';
-    document.getElementById('auth-email').textContent         = user.email || '';
-    // Avatar — photo or initial
-    const av = document.getElementById('auth-avatar');
-    if(user.photoURL){
-      av.innerHTML = `<img src="${user.photoURL}" alt="">`;
-    } else {
-      av.textContent = (user.displayName||'U')[0].toUpperCase();
-    }
-    // Load user's cloud history
-    await refreshHistory();
-    checkRestoreBanner();
-  } else {
-    // Signed out
-    document.getElementById('auth-signin-btn').style.display  = '';
-    document.getElementById('auth-profile-wrap').style.display = 'none';
-    _cachedHistory = localLoad();
-    renderHistory();
-  }
-};
-
-function isFbConfigured(){
-  // Check if user replaced the demo keys
-  const auth = window._fbAuth;
-  if(!auth) return false;
-  const key = auth.app?.options?.apiKey || '';
-  return !key.includes('DEMO_REPLACE');
-}
-
-async function authSignIn(){
-  if(!window._fbFns){ showFbNotice(); return; }
-  if(!isFbConfigured()){ showFbNotice(); return; }
-  try{
-    await window._fbFns.signInWithPopup(window._fbAuth, window._fbProvider);
-  } catch(e){
-    if(e.code !== 'auth/popup-closed-by-user')
-      alert('Login error: ' + e.message);
-  }
-}
-
-async function authSignOut(){
-  toggleAuthDropdown();
-  try{ await window._fbFns.signOut(window._fbAuth); }
-  catch(e){ console.warn(e); }
-}
-
-function toggleAuthDropdown(){
-  authDropdownOpen = !authDropdownOpen;
-  document.getElementById('auth-dropdown').classList.toggle('open', authDropdownOpen);
-}
-
-// Close dropdown on outside click
-document.addEventListener('click', e => {
-  if(authDropdownOpen && !document.getElementById('auth-profile-wrap')?.contains(e.target)){
-    authDropdownOpen = false;
-    document.getElementById('auth-dropdown')?.classList.remove('open');
-  }
-});
-
-function showFbNotice(){
-  const n = document.getElementById('fb-notice');
-  if(n){ n.style.display='flex'; setTimeout(()=>n.style.display='none', 7000); }
-}
-
 // ─── HISTORY DRAWER TOGGLE ────────────────────────
 let histDrawerOpen = false;
 function toggleHistoryPanel(){
@@ -1526,111 +1314,35 @@ function toggleHistoryPanel(){
   btn.style.color          = histDrawerOpen ? 'var(--accent2)' : 'var(--text-dim)';
 }
 
-// ─── HISTORY — Firebase (signed in) + localStorage (guest) ─────
-const HIST_KEY  = 'aips_history_v1';
-const HIST_MAX  = 50;
+// ─── HISTORY (localStorage) ──────────────────────
+const HIST_KEY = 'aips_history_v1';
+const HIST_MAX = 50;
 
-// ── Local (guest) helpers ──
-function localLoad(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch{ return []; } }
-function localSave(arr){ try{ localStorage.setItem(HIST_KEY, JSON.stringify(arr)); }catch{} }
+function histLoad(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch{ return []; } }
+function histSave(arr){ try{ localStorage.setItem(HIST_KEY, JSON.stringify(arr)); }catch{} }
 
-// ── Firestore helpers ──
-async function fbHistLoad(){
-  try{
-    const user = window._fbUser; if(!user) return null;
-    const { getDocs, collection, query, orderBy, limit } = window._fbFns;
-    const db = window._fbDb;
-    const q  = query(collection(db,'users',user.uid,'history'), orderBy('ts','desc'), limit(HIST_MAX));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data());
-  }catch(e){ console.warn('Firestore load:', e); return null; }
-}
-
-async function fbHistAdd(entry){
-  try{
-    const user = window._fbUser; if(!user) return false;
-    const { doc, setDoc, collection } = window._fbFns;
-    const db = window._fbDb;
-    // strip large scene data to keep Firestore doc < 1MB
-    const lite = {...entry, scenes: entry.scenes.map(s=>({
-      id:s.id, originalLine:s.originalLine, cameraMove:s.cameraMove,
-      imagePrompt:(s.imagePrompt||'').slice(0,600),
-      videoPrompt:(s.videoPrompt||'').slice(0,600),
-      cameraPrompt:(s.cameraPrompt||'').slice(0,300)
-    }))};
-    await setDoc(doc(db,'users',user.uid,'history',entry.id), lite);
-    return true;
-  }catch(e){ console.warn('Firestore add:', e); return false; }
-}
-
-async function fbHistDelete(id){
-  try{
-    const user = window._fbUser; if(!user) return;
-    const { doc, deleteDoc } = window._fbFns;
-    await deleteDoc(doc(window._fbDb,'users',user.uid,'history',id));
-  }catch(e){ console.warn('Firestore del:', e); }
-}
-
-async function fbHistClear(){
-  try{
-    const user = window._fbUser; if(!user) return;
-    const { getDocs, collection, query, writeBatch, doc } = window._fbFns;
-    const db = window._fbDb;
-    const snap = await getDocs(collection(db,'users',user.uid,'history'));
-    const batch = writeBatch(db);
-    snap.docs.forEach(d => batch.delete(doc(db,'users',user.uid,'history',d.id)));
-    await batch.commit();
-  }catch(e){ console.warn('Firestore clear:', e); }
-}
-
-// ── Unified API ──
-async function histAdd(entry){
-  if(window._fbUser){
-    await fbHistAdd(entry);
-    await refreshHistory();
-  } else {
-    const arr = localLoad();
-    arr.unshift(entry);
-    if(arr.length > HIST_MAX) arr.splice(HIST_MAX);
-    localSave(arr);
-    renderHistory();
-  }
-}
-
-async function histDelete(id){
-  if(window._fbUser){
-    await fbHistDelete(id);
-    await refreshHistory();
-  } else {
-    localSave(localLoad().filter(e=>e.id!==id));
-    renderHistory();
-  }
-}
-
-async function clearAllHistory(){
-  if(!confirm('সব history মুছে ফেলবেন?')) return;
-  if(window._fbUser){
-    await fbHistClear();
-    await refreshHistory();
-  } else {
-    localSave([]);
-    renderHistory();
-  }
-}
-
-// ── Load & refresh ──
-let _cachedHistory = [];
-async function refreshHistory(){
-  if(window._fbUser){
-    const remote = await fbHistLoad();
-    _cachedHistory = remote !== null ? remote : localLoad();
-  } else {
-    _cachedHistory = localLoad();
-  }
+function histAdd(entry){
+  const arr = histLoad();
+  arr.unshift(entry);
+  if(arr.length > HIST_MAX) arr.splice(HIST_MAX);
+  histSave(arr);
   renderHistory();
 }
 
-function histLoad(){ return _cachedHistory; }
+function histDelete(id){
+  histSave(histLoad().filter(e=>e.id!==id));
+  renderHistory();
+}
+
+function clearAllHistory(){
+  if(!confirm('সব history মুছে ফেলবেন?')) return;
+  histSave([]);
+  renderHistory();
+}
+
+async function refreshHistory(){
+  renderHistory();
+}
 
 function renderHistory(){
   const arr = histLoad();
@@ -1734,8 +1446,8 @@ function dismissRestoreBanner(){
 
 
 updateStats();
-// history + auth loaded via onAuthReady callback
-if(!window._fbFns){ _cachedHistory=localLoad(); renderHistory(); checkRestoreBanner(); }
+renderHistory();
+checkRestoreBanner();
 </script>
 </body>
 </html>
