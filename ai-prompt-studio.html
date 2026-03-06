@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Prompt Studio</title>
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, query, orderBy, limit, writeBatch }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  // ── Firebase config — replace with your own project ──
+  const firebaseConfig = {
+    apiKey:            "AIzaSyCd67VDP6ZDMvyosw06KCN0cSZ5t2DiR74",
+    authDomain:        "ai-prompt-studio-5a49f.firebaseapp.com",
+    projectId:         "ai-prompt-studio-5a49f",
+    storageBucket:     "ai-prompt-studio-5a49f.firebasestorage.app",
+    messagingSenderId: "26276457368",
+    appId:             "1:26276457368:web:29bfc8a45b59711c5259ed",
+    measurementId:     "G-4BLQWPM3VK"
+  };
+
+  const app      = initializeApp(firebaseConfig);
+  const auth     = getAuth(app);
+  const db       = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  // Expose to global scope for non-module JS
+  window._fbAuth     = auth;
+  window._fbDb       = db;
+  window._fbProvider = provider;
+  window._fbFns = {
+    signInWithPopup, signOut, onAuthStateChanged,
+    collection, doc, setDoc, getDocs, deleteDoc, query, orderBy, limit, writeBatch
+  };
+
+  // Auth state listener
+  onAuthStateChanged(auth, user => {
+    window._fbUser = user || null;
+    if(window.onAuthReady) window.onAuthReady(user);
+  });
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060608;
+    --surface: #0e0f14;
+    --surface2: #14151c;
+    --surface3: #1a1b24;
+    --border: rgba(255,255,255,0.07);
+    --accent: #7c6af7;
+    --accent2: #a78bfa;
+    --accent-dim: rgba(124,106,247,0.12);
+    --text: #e8e6f0;
+    --text-dim: #6b6882;
+    --text-muted: #3a3850;
+    --success: #34d399;
+    --error: #f87171;
+    --img-color: #f59e0b;
+    --vid-color: #06b6d4;
+    --img-dim: rgba(245,158,11,0.12);
+    --vid-dim: rgba(6,182,212,0.12);
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; overflow-x:hidden; }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.4;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:1300px; margin:0 auto; padding:0 20px; position:relative; z-index:1; }
+
+  /* ── HEADER ── */
+  header { padding:36px 0 44px; text-align:center; }
+  .badge {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 14px; border-radius:100px; margin-bottom:20px;
+    background:var(--accent-dim); border:1px solid rgba(124,106,247,0.3);
+    font-size:10px; font-weight:700; color:var(--accent2); letter-spacing:0.12em; text-transform:uppercase;
+  }
+  h1 { font-size:clamp(32px,5.5vw,64px); font-weight:800; letter-spacing:-0.03em; line-height:1;
+       background:linear-gradient(135deg,#fff 30%,var(--accent2)); -webkit-background-clip:text;
+       -webkit-text-fill-color:transparent; background-clip:text; }
+  .subtitle { font-size:15px; color:var(--text-dim); margin-top:12px; }
+
+  /* ── LAYOUT ── */
+  .grid { display:grid; grid-template-columns:400px 1fr; gap:20px; padding-bottom:80px; }
+  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+
+  /* ── PANEL ── */
+  .panel {
+    background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:24px;
+    position:relative; overflow:hidden;
+  }
+  .panel::before { content:''; position:absolute; top:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg,transparent,rgba(124,106,247,0.35),transparent); }
+  .ptitle { font-size:10px; font-weight:700; color:var(--text-dim); letter-spacing:0.15em;
+            text-transform:uppercase; margin-bottom:18px; display:flex; align-items:center; gap:8px; }
+  .pnum { width:20px;height:20px; background:var(--accent-dim); border:1px solid rgba(124,106,247,0.3);
+          border-radius:5px; display:flex; align-items:center; justify-content:center;
+          font-size:9px; color:var(--accent2); font-weight:700; }
+
+  /* ── INPUTS ── */
+  .flabel { display:block; font-size:10px; font-weight:700; color:var(--text-dim);
+            letter-spacing:0.1em; text-transform:uppercase; margin-bottom:7px; }
+  textarea, input[type=text], input[type=number] {
+    width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:13px;
+    padding:13px 15px; color:var(--text); font-family:var(--mono); font-size:13px; line-height:1.6;
+    outline:none; resize:vertical; transition:border-color .2s, box-shadow .2s;
+  }
+  textarea:focus, input:focus { border-color:rgba(124,106,247,.5); box-shadow:0 0 0 3px rgba(124,106,247,.07); }
+  textarea { min-height:180px; }
+  .field { margin-bottom:16px; }
+
+  /* stats */
+  .stats-bar { display:flex; background:var(--surface2); border:1px solid var(--border); border-radius:13px; overflow:hidden; margin-bottom:14px; }
+  .stat { flex:1; padding:11px 8px; text-align:center; border-right:1px solid var(--border); }
+  .stat:last-child{border-right:none;}
+  .sv { font-size:17px; font-weight:700; display:block; }
+  .sl { font-size:9px; font-weight:700; color:var(--text-muted); letter-spacing:.08em; text-transform:uppercase; margin-top:2px; display:block; }
+
+  /* chips */
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .chip {
+    padding:5px 11px; border-radius:100px; font-size:11px; font-weight:600;
+    background:var(--surface2); border:1px solid var(--border); color:var(--text-dim);
+    cursor:pointer; transition:all .2s;
+  }
+  .chip:hover,.chip.on { background:var(--accent-dim); border-color:rgba(124,106,247,.4); color:var(--accent2); }
+
+  /* ratio */
+  .ratio-row { display:flex; gap:7px; flex-wrap:wrap; }
+  .rbtn {
+    padding:7px 13px; background:var(--surface2); border:1px solid var(--border);
+    border-radius:9px; font-size:12px; font-weight:700; color:var(--text-dim);
+    cursor:pointer; transition:all .2s; font-family:var(--mono);
+  }
+  .rbtn.on { background:var(--accent-dim); border-color:rgba(124,106,247,.4); color:var(--accent2); }
+
+  /* model */
+  .model-row { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:14px; }
+  .mbtn { padding:13px; border:1px solid var(--border); border-radius:13px; background:var(--surface2);
+          color:var(--text-dim); font-family:var(--sans); font-size:13px; font-weight:700;
+          cursor:pointer; transition:all .2s; text-align:center; }
+  .mbtn .ms { font-size:10px; font-weight:400; opacity:.55; display:block; margin-top:2px; }
+  .mbtn.on { background:var(--accent-dim); border-color:rgba(124,106,247,.4); color:var(--accent2); }
+
+  /* toggle */
+  .trow { display:flex; align-items:center; justify-content:space-between; padding:12px 14px;
+          background:var(--surface2); border:1px solid var(--border); border-radius:13px; margin-bottom:10px; }
+  .tlabel { font-size:13px; font-weight:600; color:var(--text-dim); }
+  .tog { position:relative; width:40px; height:22px; background:var(--surface3); border:1px solid var(--border);
+         border-radius:100px; cursor:pointer; transition:all .3s; flex-shrink:0; }
+  .tog.on { background:var(--accent); border-color:var(--accent); }
+  .tog::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px;
+                background:#fff; border-radius:50%; transition:transform .3s; }
+  .tog.on::after { transform:translateX(18px); }
+
+  /* buttons */
+  .btn-gen {
+    width:100%; padding:15px; background:linear-gradient(135deg,var(--accent),#9f7aea);
+    border:none; border-radius:15px; color:#fff; font-family:var(--sans);
+    font-size:15px; font-weight:700; cursor:pointer; transition:all .2s; letter-spacing:.02em;
+    position:relative; overflow:hidden;
+  }
+  .btn-gen:hover { transform:translateY(-1px); box-shadow:0 8px 28px rgba(124,106,247,.4); }
+  .btn-gen:active { transform:scale(.98); }
+  .btn-gen:disabled { opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  .btn-sec { padding:9px 16px; background:var(--surface2); border:1px solid var(--border);
+             border-radius:10px; font-size:11px; font-weight:700; color:var(--text-dim);
+             cursor:pointer; transition:all .2s; font-family:var(--sans);
+             text-transform:uppercase; letter-spacing:.07em; }
+  .btn-sec:hover { border-color:rgba(124,106,247,.35); color:var(--accent2); }
+
+  /* error / progress */
+  .errbox { background:rgba(248,113,113,.08); border:1px solid rgba(248,113,113,.25);
+            border-radius:13px; padding:13px 15px; font-family:var(--mono); font-size:12px;
+            color:var(--error); margin-bottom:14px; display:none; }
+  .progwrap { display:none; margin-top:14px; }
+  .progbar-bg { background:var(--surface2); border-radius:100px; height:3px; overflow:hidden; margin-bottom:10px; }
+  .progbar { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2));
+             border-radius:100px; animation:prog 1.5s ease-in-out infinite; width:55%; }
+  @keyframes prog { 0%{transform:translateX(-120%)} 100%{transform:translateX(280%)} }
+  .progmsg { font-family:var(--mono); font-size:11px; color:var(--accent2); text-align:center; }
+
+  /* ── OUTPUT ── */
+  .out-panel { position:relative; }
+  .empty-out { text-align:center; padding:80px 20px; color:var(--text-muted); }
+  .empty-icon { font-size:48px; margin-bottom:16px; opacity:.25; }
+  .empty-text { font-size:14px; }
+
+  /* result tabs */
+  .rtabs { display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap; }
+  .rtab { padding:8px 18px; border-radius:100px; border:1px solid var(--border);
+          background:var(--surface2); font-size:11px; font-weight:700; color:var(--text-dim);
+          cursor:pointer; transition:all .2s; font-family:var(--sans); text-transform:uppercase; letter-spacing:.08em; }
+  .rtab.on { background:var(--accent-dim); border-color:rgba(124,106,247,.4); color:var(--accent2); }
+
+  .sec-hdr { display:flex; align-items:center; justify-content:space-between;
+             margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+  .sec-ttl { font-size:11px; font-weight:700; color:var(--text-dim); letter-spacing:.12em;
+             text-transform:uppercase; display:flex; align-items:center; gap:8px; }
+  .cnt-badge { font-size:10px; padding:2px 8px; background:var(--accent-dim);
+               border-radius:100px; color:var(--accent2); font-weight:700; border:1px solid rgba(124,106,247,.2); }
+
+  /* scene card */
+  .scene-card {
+    background:var(--surface2); border:1px solid var(--border); border-radius:18px;
+    margin-bottom:16px; overflow:hidden;
+    animation:fadeUp .3s ease both;
+  }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .scene-card:hover { border-color:rgba(124,106,247,.25); }
+
+  .sc-head {
+    display:flex; align-items:center; gap:10px; padding:14px 18px 0;
+  }
+  .sc-num { font-family:var(--mono); font-size:10px; font-weight:500; color:var(--accent2);
+            background:var(--accent-dim); border:1px solid rgba(124,106,247,.25);
+            padding:3px 9px; border-radius:6px; flex-shrink:0; }
+  .sc-orig { font-family:var(--mono); font-size:11px; color:var(--text-dim); font-style:italic;
+             line-height:1.5; flex:1; }
+
+  .sc-body { padding:14px 18px 18px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:700px){.sc-body{grid-template-columns:1fr;}}
+
+  .prompt-box {
+    border-radius:13px; padding:14px;
+    position:relative;
+  }
+  .prompt-box.img-box { background:rgba(245,158,11,.06); border:1px solid rgba(245,158,11,.2); }
+  .prompt-box.vid-box { background:rgba(6,182,212,.06); border:1px solid rgba(6,182,212,.2); }
+
+  .pb-label {
+    font-size:9px; font-weight:700; letter-spacing:.15em; text-transform:uppercase;
+    margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .img-box .pb-label { color:var(--img-color); }
+  .vid-box .pb-label { color:var(--vid-color); }
+
+  .pb-text { font-family:var(--mono); font-size:12px; line-height:1.65; color:var(--text); }
+
+  /* COPY BUTTON */
+  .copy-btn {
+    padding:4px 10px; border-radius:6px; border:1px solid currentColor;
+    font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    cursor:pointer; background:transparent; font-family:var(--sans);
+    transition:all .15s; opacity:.7;
+  }
+  .img-box .copy-btn { color:var(--img-color); }
+  .vid-box .copy-btn { color:var(--vid-color); }
+  .copy-btn:hover { opacity:1; }
+  .copy-btn.ok { color:var(--success) !important; border-color:var(--success) !important; opacity:1; }
+
+  /* copy all row */
+  .copy-all-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+
+  /* chars */
+  .chars-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:13px; }
+  .char-card { background:var(--surface2); border:1px solid var(--border); border-radius:16px; padding:18px;
+               animation:fadeUp .3s ease both; }
+  .char-name { font-weight:700; font-size:14px; color:var(--accent2); margin-bottom:5px; }
+  .char-desc { font-size:11px; color:var(--text-dim); font-style:italic; margin-bottom:10px; }
+  .char-prompt { font-family:var(--mono); font-size:11px; color:var(--text); line-height:1.6; }
+
+  /* voiceover */
+  .vo-box { background:var(--surface2); border:1px solid var(--border); border-radius:16px;
+            padding:20px; font-family:var(--mono); font-size:13px; line-height:1.75;
+            color:var(--text); white-space:pre-wrap; }
+
+  /* file btn */
+  .file-btn { display:flex; align-items:center; justify-content:center; gap:7px; width:100%;
+              padding:11px; border:1px dashed var(--border); border-radius:13px; background:transparent;
+              color:var(--text-dim); font-family:var(--sans); font-size:12px; font-weight:600;
+              cursor:pointer; transition:all .2s; margin-top:8px; }
+  .file-btn:hover { border-color:rgba(124,106,247,.4); color:var(--accent2); background:var(--accent-dim); }
+
+  .sp { height:14px; }
+
+  /* ── HISTORY ── */
+  .history-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .history-title {
+    font-size: 11px; font-weight: 700; color: var(--text-dim);
+    letter-spacing: .14em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .history-count {
+    font-size: 10px; padding: 2px 9px; border-radius: 100px;
+    background: var(--accent-dim); border: 1px solid rgba(124,106,247,.25);
+    color: var(--accent2); font-weight: 700;
+  }
+  .history-actions { display: flex; gap: 8px; align-items: center; }
+
+  .hist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 14px;
+  }
+
+  .hist-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 18px; overflow: hidden; cursor: pointer;
+    transition: border-color .2s, transform .15s, box-shadow .2s;
+    position: relative;
+    animation: fadeUp .3s ease both;
+  }
+  .hist-card:hover {
+    border-color: rgba(124,106,247,.4);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  }
+  .hist-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:1px;
+    background: linear-gradient(90deg,transparent,rgba(124,106,247,.3),transparent);
+  }
+  .hist-card-top {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hist-card-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .hist-time {
+    font-family: var(--mono); font-size: 9px; color: var(--text-muted);
+    letter-spacing: .06em;
+  }
+  .hist-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+  .hist-badge {
+    font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 100px;
+    letter-spacing: .07em; text-transform: uppercase;
+  }
+  .hb-model { background: var(--accent-dim); border: 1px solid rgba(124,106,247,.25); color: var(--accent2); }
+  .hb-scenes { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); color: var(--img-color); }
+  .hb-ref { background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.25); color: #34d399; }
+
+  .hist-script-preview {
+    font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+    line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .hist-card-bottom {
+    padding: 10px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .hist-stats { display: flex; gap: 14px; }
+  .hist-stat { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
+  .hist-stat span { color: var(--text-dim); font-weight: 600; }
+  .hist-del {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.2);
+    color: var(--error); font-size: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s; flex-shrink: 0;
+    opacity: 0;
+  }
+  .hist-card:hover .hist-del { opacity: 1; }
+  .hist-del:hover { background: rgba(248,113,113,.2); }
+
+  .hist-empty {
+    text-align: center; padding: 60px 20px;
+    color: var(--text-muted); font-size: 13px;
+  }
+  .hist-empty-icon { font-size: 36px; margin-bottom: 12px; opacity: .2; }
+
+  /* restore banner */
+  .restore-banner {
+    display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--surface); border: 1px solid rgba(124,106,247,.4);
+    border-radius: 14px; padding: 12px 20px;
+    display: flex; align-items: center; gap: 14px;
+    font-size: 13px; font-weight: 600; color: var(--text);
+    box-shadow: 0 12px 40px rgba(0,0,0,.5); z-index: 999;
+    animation: slideUp .25s ease;
+  }
+  @keyframes slideUp { from{opacity:0;transform:translateX(-50%) translateY(10px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+  .restore-banner button {
+    padding: 6px 14px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    cursor: pointer; font-family: var(--sans); letter-spacing: .05em;
+    transition: all .15s;
+  }
+  .rb-yes { background: var(--accent); border: none; color: #fff; }
+  .rb-yes:hover { background: var(--accent2); }
+  .rb-no  { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+  .rb-no:hover { border-color: rgba(124,106,247,.3); color: var(--accent2); }
+
+  /* ── AUTH UI ── */
+  .auth-btn {
+    position:absolute; top:0; right:0;
+    display:flex; align-items:center; gap:8px;
+    padding:7px 14px; border-radius:11px;
+    background:var(--surface2); border:1px solid var(--border);
+    color:var(--text-dim); font-family:var(--sans); font-size:11px; font-weight:700;
+    cursor:pointer; transition:all .2s; letter-spacing:.04em; z-index:10;
+  }
+  .auth-btn:hover { border-color:rgba(124,106,247,.45); color:var(--accent2); }
+  .auth-btn.signed-in { background:var(--accent-dim); border-color:rgba(124,106,247,.3); color:var(--accent2); }
+
+  .auth-avatar {
+    width:24px; height:24px; border-radius:50%;
+    background:var(--accent); display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; color:#fff; overflow:hidden; flex-shrink:0;
+  }
+  .auth-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+
+  /* dropdown */
+  .auth-dropdown {
+    position:absolute; top:calc(100% + 8px); right:0; min-width:220px;
+    background:var(--surface); border:1px solid rgba(124,106,247,.25);
+    border-radius:14px; padding:8px; box-shadow:0 16px 48px rgba(0,0,0,.6);
+    z-index:200; display:none; animation:fadeUp .15s ease;
+  }
+  .auth-dropdown.open { display:block; }
+  .auth-user-info {
+    padding:10px 12px 12px; border-bottom:1px solid var(--border); margin-bottom:6px;
+  }
+  .auth-user-name { font-size:13px; font-weight:700; color:var(--text); margin-bottom:2px; }
+  .auth-user-email { font-size:10px; color:var(--text-muted); font-family:var(--mono); }
+  .auth-menu-item {
+    width:100%; padding:9px 12px; border-radius:9px; border:none;
+    background:transparent; color:var(--text-dim); font-family:var(--sans);
+    font-size:12px; font-weight:600; cursor:pointer; text-align:left;
+    display:flex; align-items:center; gap:8px; transition:all .15s;
+  }
+  .auth-menu-item:hover { background:var(--surface2); color:var(--text); }
+  .auth-menu-item.danger { color:var(--error); }
+  .auth-menu-item.danger:hover { background:rgba(248,113,113,.08); }
+
+  /* firebase config notice */
+  .fb-notice {
+    position:fixed; top:16px; left:50%; transform:translateX(-50%);
+    background:var(--surface); border:1px solid rgba(245,158,11,.35);
+    border-radius:12px; padding:12px 18px; font-size:12px; color:var(--img-color);
+    font-family:var(--mono); z-index:999; max-width:480px; text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,.5); display:none;
+    animation:fadeUp .2s ease;
+  }
+  ::-webkit-scrollbar{width:5px;height:5px}
+  ::-webkit-scrollbar-thumb{background:var(--text-muted);border-radius:10px}
+
+  /* Reference image */
+  #ref-dropzone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  #ref-dropzone.drag-over > div { color: var(--accent2) !important; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header style="position:relative;">
+    <!-- History toggle button — top left -->
+    <button id="hist-toggle-btn" onclick="toggleHistoryPanel()"
+      style="position:absolute;top:0;left:0;display:flex;align-items:center;gap:7px;
+             padding:8px 14px;background:var(--surface2);border:1px solid var(--border);
+             border-radius:11px;color:var(--text-dim);font-family:var(--sans);font-size:11px;
+             font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.05em;">
+      🕓 History
+      <span id="hist-nav-count"
+        style="display:none;padding:1px 7px;border-radius:100px;
+               background:var(--accent-dim);border:1px solid rgba(124,106,247,.3);
+               color:var(--accent2);font-size:9px;font-weight:700;">0</span>
+    </button>
+
+    <!-- Auth button — top right -->
+    <div style="position:absolute;top:0;right:0;" id="auth-wrap">
+      <!-- Not signed in -->
+      <button id="auth-signin-btn" class="auth-btn" onclick="authSignIn()">
+        <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+          <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+          <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+          <path d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+          <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z" fill="#EA4335"/>
+        </svg>
+        Google দিয়ে Login
+      </button>
+
+      <!-- Signed in -->
+      <div id="auth-profile-wrap" style="display:none;position:relative;">
+        <button class="auth-btn signed-in" onclick="toggleAuthDropdown()" id="auth-profile-btn">
+          <div class="auth-avatar" id="auth-avatar">U</div>
+          <span id="auth-display-name">User</span>
+          <span style="font-size:10px;opacity:.6;">▼</span>
+        </button>
+        <div class="auth-dropdown" id="auth-dropdown">
+          <div class="auth-user-info">
+            <div class="auth-user-name" id="auth-full-name">—</div>
+            <div class="auth-user-email" id="auth-email">—</div>
+          </div>
+          <button class="auth-menu-item" onclick="toggleHistoryPanel();toggleAuthDropdown()">
+            🕓 My History
+          </button>
+          <button class="auth-menu-item danger" onclick="authSignOut()">
+            ↩ Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Firebase config notice -->
+    <div class="fb-notice" id="fb-notice">
+      ⚠️ Firebase config প্রয়োজন — <code>firebaseConfig</code> আপনার project-এর key দিয়ে replace করুন।
+      <button onclick="this.parentElement.style.display='none'" style="margin-left:10px;background:transparent;border:none;color:inherit;cursor:pointer;font-size:14px;">✕</button>
+    </div>
+
+    <div class="badge">⚡ Powered by Claude AI</div>
+    <h1>AI PROMPT STUDIO</h1>
+    <p class="subtitle">Script → Image Prompt + Video Prompt — প্রতিটি সিন আলাদাভাবে</p>
+  </header>
+
+  <div class="grid">
+
+    <!-- ═══ LEFT PANEL ═══ -->
+    <div>
+      <div class="panel">
+        <div class="ptitle"><span class="pnum">1</span> স্ক্রিপ্ট ইনপুট</div>
+
+        <div class="stats-bar">
+          <div class="stat"><span class="sv" id="wc">0</span><span class="sl">Words</span></div>
+          <div class="stat"><span class="sv" id="dur-disp">0s</span><span class="sl">Duration</span></div>
+          <div class="stat"><span class="sv" id="sc">0</span><span class="sl">Scenes</span></div>
+        </div>
+        <!-- Duration info box -->
+        <div id="dur-info-box" style="display:none; margin-bottom:14px; padding:11px 14px; background:var(--accent-dim); border:1px solid rgba(124,106,247,0.25); border-radius:12px; font-family:var(--mono); font-size:11px; color:var(--accent2); line-height:1.7;"></div>
+
+        <div class="field">
+          <label class="flabel">গল্প / স্ক্রিপ্ট</label>
+          <textarea id="script" placeholder="এখানে আপনার গল্প বা স্ক্রিপ্ট পেস্ট করুন..." oninput="updateStats()"></textarea>
+          <button class="file-btn" onclick="document.getElementById('fup').click()">⬆ .txt ফাইল আপলোড</button>
+          <input type="file" id="fup" accept=".txt" style="display:none" onchange="handleFile(event)">
+        </div>
+
+        <div class="sp"></div>
+        <div class="ptitle"><span class="pnum">2</span> স্টাইল সেটিংস</div>
+
+        <div class="field">
+          <label class="flabel">Niche / Genre</label>
+          <div class="chips">
+            <span class="chip" onclick="setNiche(this,'ইসলামিক')">ইসলামিক</span>
+            <span class="chip" onclick="setNiche(this,'Cinematic')">Cinematic</span>
+            <span class="chip" onclick="setNiche(this,'Historical')">Historical</span>
+            <span class="chip" onclick="setNiche(this,'Documentary')">Documentary</span>
+            <span class="chip" onclick="setNiche(this,'Fantasy')">Fantasy</span>
+          </div>
+          <input type="text" id="niche" placeholder="e.g. ইসলামিক ঐতিহাসিক, সিনেমাটিক...">
+        </div>
+
+        <div class="field">
+          <label class="flabel">Image Style</label>
+          <div class="chips" id="style-chips">
+            <span class="chip on" onclick="toggleChip(this)">Cinematic 4K</span>
+            <span class="chip" onclick="toggleChip(this)">Photorealistic</span>
+            <span class="chip" onclick="toggleChip(this)">Film Grain</span>
+            <span class="chip" onclick="toggleChip(this)">Anamorphic Lens</span>
+            <span class="chip" onclick="toggleChip(this)">Golden Hour</span>
+            <span class="chip" onclick="toggleChip(this)">Noir</span>
+          </div>
+          <input type="text" id="style" value="cinematic, photorealistic, 4k" style="margin-top:9px">
+        </div>
+
+        <div class="field">
+          <label class="flabel">Aspect Ratio</label>
+          <div class="ratio-row">
+            <button class="rbtn on" onclick="setRatio(this)">16:9</button>
+            <button class="rbtn" onclick="setRatio(this)">9:16</button>
+            <button class="rbtn" onclick="setRatio(this)">4:3</button>
+            <button class="rbtn" onclick="setRatio(this)">1:1</button>
+          </div>
+        </div>
+
+        <div class="sp"></div>
+
+        <!-- ═══ REFERENCE IMAGE SECTION ═══ -->
+        <div style="margin-bottom:16px;">
+          <!-- Collapsible Header Toggle -->
+          <div onclick="toggleRefSection()" id="ref-section-header"
+            style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;transition:all .2s;user-select:none;"
+            onmouseenter="this.style.borderColor='rgba(124,106,247,.4)'"
+            onmouseleave="this.style.borderColor=document.getElementById('ref-section-body').style.display!='none'?'rgba(124,106,247,.35)':'var(--border)'">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="width:20px;height:20px;background:var(--accent-dim);border:1px solid rgba(124,106,247,0.3);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--accent2);font-weight:700;flex-shrink:0;">3</span>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-dim);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:8px;">
+                  🖼 Reference Image Style
+                  <span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:100px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);color:#34d399;letter-spacing:.08em;">OPTIONAL</span>
+                </div>
+                <div id="ref-header-hint" style="font-size:10px;color:var(--text-muted);margin-top:2px;font-family:var(--mono);">ক্লিক করুন — ছবি আপলোড করলে সেই style-এ prompt তৈরি হবে</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <!-- Active image badge (shown when image is loaded) -->
+              <div id="ref-active-badge" style="display:none;padding:3px 10px;border-radius:100px;background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.3);font-size:9px;font-weight:700;color:#34d399;letter-spacing:.07em;">✓ ACTIVE</div>
+              <div id="ref-chevron" style="font-size:14px;color:var(--text-muted);transition:transform .3s;">▼</div>
+            </div>
+          </div>
+
+          <!-- Collapsible Body -->
+          <div id="ref-section-body" style="display:none;margin-top:8px;">
+            <div style="padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;border-top-left-radius:4px;border-top-right-radius:4px;">
+
+              <!-- Info banner -->
+              <div style="padding:10px 12px;background:rgba(124,106,247,.06);border:1px solid rgba(124,106,247,.15);border-radius:10px;margin-bottom:14px;font-size:11px;color:var(--text-dim);line-height:1.6;">
+                💡 <strong style="color:var(--accent2);">কীভাবে কাজ করে:</strong> একটি ছবি upload করুন — Claude সেই ছবির <em>lighting, color palette, texture, mood</em> বিশ্লেষণ করে সব scene-এর Image ও Video Prompt-এ সেই style অনুসরণ করবে। ছবি না দিলেও prompt তৈরি হবে।
+              </div>
+
+              <!-- Drop Zone -->
+              <div id="ref-dropzone"
+                onclick="document.getElementById('ref-img-input').click()"
+                ondragover="event.preventDefault();this.classList.add('drag-over')"
+                ondragleave="this.classList.remove('drag-over')"
+                ondrop="handleRefDrop(event)"
+                style="border:2px dashed rgba(124,106,247,.3);border-radius:14px;padding:32px 16px;text-align:center;cursor:pointer;transition:all .25s;position:relative;background:rgba(124,106,247,.03);">
+                <div style="font-size:36px;margin-bottom:10px;filter:grayscale(.4);">🖼️</div>
+                <div style="font-size:13px;font-weight:700;color:var(--text-dim);margin-bottom:4px;">ছবি drag করুন বা ক্লিক করুন</div>
+                <div style="font-size:11px;color:var(--text-muted);">JPG · PNG · WEBP · GIF সমর্থিত</div>
+                <div style="margin-top:12px;display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border:1px solid rgba(124,106,247,.3);border-radius:100px;font-size:10px;font-weight:700;color:var(--accent2);letter-spacing:.07em;text-transform:uppercase;">
+                  📂 ফাইল বেছে নিন
+                </div>
+              </div>
+              <input type="file" id="ref-img-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="handleRefImage(event)">
+
+              <!-- Preview (hidden by default) -->
+              <div id="ref-preview-box" style="display:none;margin-top:12px;">
+                <div style="position:relative;">
+                  <img id="ref-preview-img" src="" alt="Reference"
+                    style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;border:1px solid rgba(124,106,247,.25);display:block;">
+                  <!-- Analyzing overlay -->
+                  <div id="ref-analyzing" style="display:none;position:absolute;inset:0;background:rgba(6,6,8,.8);border-radius:12px;align-items:center;justify-content:center;flex-direction:column;gap:10px;">
+                    <div style="width:28px;height:28px;border:2px solid var(--accent2);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;"></div>
+                    <span style="font-size:11px;color:var(--accent2);font-family:var(--mono);font-weight:600;">Style বিশ্লেষণ হচ্ছে...</span>
+                  </div>
+                  <!-- Remove button -->
+                  <button onclick="removeRefImage()"
+                    style="position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;background:rgba(248,113,113,.92);border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.4);">✕</button>
+                  <!-- Active indicator -->
+                  <div style="position:absolute;bottom:8px;left:8px;padding:4px 10px;border-radius:100px;background:rgba(52,211,153,.9);font-size:9px;font-weight:700;color:#065f46;letter-spacing:.07em;">✓ STYLE ACTIVE</div>
+                </div>
+
+                <!-- Style analysis result -->
+                <div id="ref-style-result" style="display:none;margin-top:10px;padding:12px 14px;background:rgba(124,106,247,.08);border:1px solid rgba(124,106,247,.22);border-radius:11px;">
+                  <div style="font-size:9px;font-weight:700;color:var(--accent2);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                    ✦ Claude-এর বিশ্লেষণ
+                    <span style="font-size:9px;padding:1px 7px;border-radius:100px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:#34d399;font-weight:700;">Vision AI</span>
+                  </div>
+                  <div id="ref-style-text" style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.6;"></div>
+                </div>
+
+                <!-- Re-upload option -->
+                <button onclick="document.getElementById('ref-img-input').click()"
+                  style="width:100%;margin-top:8px;padding:9px;border:1px dashed rgba(124,106,247,.25);border-radius:10px;background:transparent;color:var(--text-muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--sans);"
+                  onmouseenter="this.style.borderColor='rgba(124,106,247,.5)';this.style.color='var(--accent2)'"
+                  onmouseleave="this.style.borderColor='rgba(124,106,247,.25)';this.style.color='var(--text-muted)'">
+                  🔄 অন্য ছবি দিয়ে পরিবর্তন করুন
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="sp"></div>
+        <div class="ptitle"><span class="pnum">4</span> জেনারেশন অপশন</div>
+
+
+        <div class="field">
+          <label class="flabel">Video Model</label>
+          <div class="model-row">
+            <button class="mbtn" id="mg" onclick="setModel('Grok')">Grok<span class="ms">6s / scene</span></button>
+            <button class="mbtn on" id="mv" onclick="setModel('Veo 3')">Veo 3<span class="ms">8s / scene</span></button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="flabel" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>পড়ার গতি (WPM)</span>
+            <span id="wpm-disp" style="color:var(--accent2);font-size:12px;font-weight:700;">130 WPM</span>
+          </label>
+          <input type="range" id="wpm-range" min="80" max="220" step="5" value="130"
+            oninput="document.getElementById('wpm-disp').textContent=this.value+' WPM'; updateStats();"
+            style="width:100%;accent-color:var(--accent);margin-top:6px;">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px;font-family:var(--mono);">
+            <span>80 (ধীর)</span><span>150 (স্বাভাবিক)</span><span>220 (দ্রুত)</span>
+          </div>
+        </div>
+
+        <!-- LIVE SCENE CALCULATOR BOX -->
+        <div id="calc-box" style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;">⚡ Live Scene Calculator</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 6px;">
+              <span style="font-size:16px;font-weight:700;color:var(--text);display:block;" id="calc-dur">0s</span>
+              <span style="font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;">ভিডিও দৈর্ঘ্য</span>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 6px;">
+              <span style="font-size:16px;font-weight:700;color:var(--img-color);display:block;" id="calc-sec">8s</span>
+              <span style="font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;">প্রতি সিন</span>
+            </div>
+            <div style="background:var(--accent-dim);border:1px solid rgba(124,106,247,.3);border-radius:10px;padding:10px 6px;">
+              <span style="font-size:16px;font-weight:700;color:var(--accent2);display:block;" id="calc-scenes">0</span>
+              <span style="font-size:9px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;">মোট সিন</span>
+            </div>
+          </div>
+          <div id="calc-formula" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-top:8px;text-align:center;"></div>
+        </div>
+
+        <div class="trow">
+          <span class="tlabel">👥 চরিত্র প্রম্পট তৈরি করবে</span>
+          <div class="tog on" id="t-char" onclick="toggl('t-char','v-char')"></div>
+          <input type="hidden" id="v-char" value="true">
+        </div>
+        <div class="trow">
+          <span class="tlabel">🎙 ভয়েসওভার স্ক্রিপ্ট তৈরি করবে</span>
+          <div class="tog on" id="t-vo" onclick="toggl('t-vo','v-vo')"></div>
+          <input type="hidden" id="v-vo" value="true">
+        </div>
+
+        <div class="errbox" id="errbox"></div>
+        <div class="sp"></div>
+
+        <button class="btn-gen" id="genbtn" onclick="generate()">✦ Prompt তৈরি করুন</button>
+
+        <div class="progwrap" id="progwrap">
+          <div class="progbar-bg"><div class="progbar"></div></div>
+          <div class="progmsg" id="progmsg">Claude বিশ্লেষণ করছে...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ RIGHT OUTPUT ═══ -->
+    <div class="panel out-panel" id="out-panel">
+      <div class="empty-out" id="empty-out">
+        <div class="empty-icon">✦</div>
+        <div class="empty-text">স্ক্রিপ্ট দিন এবং Generate করুন<br>Image Prompt ও Video Prompt আলাদাভাবে দেখাবে</div>
+      </div>
+
+      <div id="out-content" style="display:none">
+        <div class="rtabs">
+          <button class="rtab on" onclick="switchTab('scenes')">🎬 Scenes (<span id="sn-cnt">0</span>)</button>
+          <button class="rtab" onclick="switchTab('chars')">👥 Characters (<span id="ch-cnt">0</span>)</button>
+          <button class="rtab" onclick="switchTab('vo')">🎙 Voiceover</button>
+        </div>
+
+        <!-- SCENES TAB -->
+        <div id="tab-scenes">
+          <div class="sec-hdr">
+            <span class="sec-ttl">🎬 সিন প্রম্পটস <span class="cnt-badge" id="sc-badge">0</span></span>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+              <div id="out-dur-info" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);"></div>
+              <div class="copy-all-row">
+              <button class="btn-sec" onclick="copyAllImg()">📷 সব Image Copy</button>
+              <button class="btn-sec" onclick="copyAllVid()">🎥 সব Video Copy</button>
+              <button class="btn-sec" onclick="copyAllBoth()">📋 সব Copy</button>
+            </div>
+            </div>
+          </div>
+          <div id="scenes-list"></div>
+        </div>
+
+        <!-- CHARS TAB -->
+        <div id="tab-chars" style="display:none">
+          <div class="sec-hdr">
+            <span class="sec-ttl">👥 চরিত্র প্রম্পটস</span>
+            <button class="btn-sec" onclick="copyAllChars()">সব Copy</button>
+          </div>
+          <div class="chars-grid" id="chars-list"></div>
+        </div>
+
+        <!-- VO TAB -->
+        <div id="tab-vo" style="display:none">
+          <div class="sec-hdr">
+            <span class="sec-ttl">🎙 ভয়েসওভার স্ক্রিপ্ট</span>
+            <button class="btn-sec" onclick="copyVO()">সব Copy</button>
+          </div>
+          <div class="vo-box" id="vo-box"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══ HISTORY DRAWER (slide-in overlay) ══ -->
+<div id="hist-drawer"
+  style="position:fixed;top:0;left:0;bottom:0;width:min(480px,95vw);
+         background:var(--surface);border-right:1px solid rgba(124,106,247,.25);
+         z-index:900;transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+         display:flex;flex-direction:column;overflow:hidden;">
+
+  <!-- Drawer header -->
+  <div style="padding:20px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
+              display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);">🕓 Generation History</span>
+      <span id="hist-count" style="padding:2px 9px;border-radius:100px;background:var(--accent-dim);
+            border:1px solid rgba(124,106,247,.25);color:var(--accent2);font-size:10px;font-weight:700;">0</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn-sec" id="hist-clear-btn" onclick="clearAllHistory()"
+        style="color:var(--error);border-color:rgba(248,113,113,.3);display:none;">🗑 সব মুছুন</button>
+      <button onclick="toggleHistoryPanel()"
+        style="width:30px;height:30px;border-radius:8px;background:var(--surface2);
+               border:1px solid var(--border);color:var(--text-dim);font-size:16px;
+               cursor:pointer;display:flex;align-items:center;justify-content:center;
+               transition:all .15s;">✕</button>
+    </div>
+  </div>
+
+  <!-- Drawer body — scrollable -->
+  <div style="flex:1;overflow-y:auto;padding:16px;" id="hist-grid">
+    <div class="hist-empty">
+      <div class="hist-empty-icon">🕓</div>
+      এখনো কোনো generation নেই
+    </div>
+  </div>
+</div>
+
+<!-- Backdrop -->
+<div id="hist-backdrop"
+  style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:899;
+         opacity:0;pointer-events:none;transition:opacity .3s;"
+  onclick="toggleHistoryPanel()"></div>
+
+<!-- Restore banner (toast) -->
+<div class="restore-banner" id="restore-banner" style="display:none">
+  <span>📂 আগের session restore করবেন?</span>
+  <button class="rb-yes" onclick="restoreLastSession()">হ্যাঁ, দেখাও</button>
+  <button class="rb-no"  onclick="dismissRestoreBanner()">না</button>
+</div>
+
+<div class="restore-banner" id="restore-banner" style="display:none">
+  <span>📂 আগের session restore করবেন?</span>
+  <button class="rb-yes" onclick="restoreLastSession()">হ্যাঁ, দেখাও</button>
+  <button class="rb-no"  onclick="dismissRestoreBanner()">না</button>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────
+let model = 'Veo 3', ratio = '16:9';
+let data = { scenes:[], chars:[], voiceover:'' };
+
+// ─── SCENE CALC ─────────────────────────────────────
+function calcScenes(){
+  const text  = document.getElementById('script').value;
+  const wpm   = parseInt(document.getElementById('wpm-range').value) || 130;
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const secPerScene = model === 'Grok' ? 6 : 8;
+
+  // Duration in seconds (words / wpm * 60)
+  const durSec = words > 0 ? Math.round((words / wpm) * 60) : 0;
+  const scenes = durSec > 0 ? Math.max(1, Math.round(durSec / secPerScene)) : 0;
+
+  // Format duration
+  const durFmt = durSec >= 60
+    ? `${Math.floor(durSec/60)}m ${durSec%60}s`
+    : `${durSec}s`;
+
+  return { words, durSec, durFmt, secPerScene, scenes };
+}
+
+// ─── STATS ──────────────────────────────────────────
+function updateStats(){
+  const { words, durFmt, secPerScene, scenes, durSec } = calcScenes();
+  const wpm = parseInt(document.getElementById('wpm-range').value) || 130;
+
+  document.getElementById('wc').textContent      = words;
+  document.getElementById('dur-disp').textContent = durFmt;
+  document.getElementById('sc').textContent       = scenes;
+
+  // Live calculator box
+  document.getElementById('calc-dur').textContent    = durFmt;
+  document.getElementById('calc-sec').textContent    = secPerScene + 's';
+  document.getElementById('calc-scenes').textContent = scenes;
+
+  if(words > 0){
+    document.getElementById('calc-formula').textContent =
+      `${words} শব্দ ÷ ${wpm} WPM × 60 = ${durSec}s ÷ ${secPerScene}s = ${scenes} scenes`;
+  } else {
+    document.getElementById('calc-formula').textContent = 'স্ক্রিপ্ট দিন — হিসাব দেখাবে';
+  }
+}
+
+// ─── NICHE ──────────────────────────────────────────
+function setNiche(el, v){ document.getElementById('niche').value = v; }
+
+// ─── STYLE CHIPS ────────────────────────────────────
+function toggleChip(el){
+  el.classList.toggle('on');
+  const active = [...document.querySelectorAll('#style-chips .chip.on')].map(e=>e.textContent.toLowerCase());
+  document.getElementById('style').value = active.join(', ') || 'cinematic, photorealistic, 4k';
+}
+
+// ─── RATIO ──────────────────────────────────────────
+function setRatio(el){
+  document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on'); ratio = el.textContent;
+}
+
+// ─── MODEL ──────────────────────────────────────────
+function setModel(m){
+  model = m;
+  document.getElementById('mg').classList.toggle('on', m==='Grok');
+  document.getElementById('mv').classList.toggle('on', m==='Veo 3');
+  updateStats(); // recalculate scenes on model change
+}
+
+// ─── TOGGLE ─────────────────────────────────────────
+function toggl(tid, vid){
+  const cur = document.getElementById(vid).value === 'true';
+  document.getElementById(vid).value = String(!cur);
+  document.getElementById(tid).classList.toggle('on', !cur);
+}
+
+// ─── REFERENCE SECTION TOGGLE ───────────────────────
+function toggleRefSection(){
+  const body    = document.getElementById('ref-section-body');
+  const chevron = document.getElementById('ref-chevron');
+  const header  = document.getElementById('ref-section-header');
+  const isOpen  = body.style.display !== 'none';
+
+  body.style.display = isOpen ? 'none' : '';
+  chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+  header.style.borderColor = isOpen ? 'var(--border)' : 'rgba(124,106,247,.35)';
+  header.style.borderBottomLeftRadius = isOpen ? '14px' : '4px';
+  header.style.borderBottomRightRadius = isOpen ? '14px' : '4px';
+}
+
+function updateRefBadge(){
+  const badge = document.getElementById('ref-active-badge');
+  const hint  = document.getElementById('ref-header-hint');
+  if(refImageBase64){
+    badge.style.display = '';
+    hint.textContent = 'ছবির style অনুযায়ী সব prompt তৈরি হবে';
+    hint.style.color = '#34d399';
+  } else {
+    badge.style.display = 'none';
+    hint.textContent = 'ক্লিক করুন — ছবি আপলোড করলে সেই style-এ prompt তৈরি হবে';
+    hint.style.color = 'var(--text-muted)';
+  }
+}
+
+// ─── FILE ───────────────────────────────────────────
+function handleFile(e){
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ev => { document.getElementById('script').value = ev.target.result; updateStats(); };
+  r.readAsText(f);
+}
+
+// ─── REFERENCE IMAGE ────────────────────────────────
+let refImageBase64 = null;   // base64 string (no prefix)
+let refImageMime   = null;   // e.g. "image/jpeg"
+let refStyleText   = null;   // Claude-analyzed style description
+
+function handleRefDrop(e){
+  e.preventDefault();
+  document.getElementById('ref-dropzone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if(file && file.type.startsWith('image/')) processRefImage(file);
+}
+
+function handleRefImage(e){
+  const file = e.target.files[0];
+  if(file) processRefImage(file);
+}
+
+function processRefImage(file){
+  refImageMime = file.type;
+  refStyleText = null;
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const dataUrl = ev.target.result;
+    refImageBase64 = dataUrl.split(',')[1];
+
+    // Show preview, hide dropzone
+    document.getElementById('ref-preview-img').src = dataUrl;
+    document.getElementById('ref-preview-box').style.display = '';
+    document.getElementById('ref-dropzone').style.display = 'none';
+
+    // Update header badge
+    updateRefBadge();
+
+    // Auto-analyze style with Claude Vision
+    analyzeRefStyle();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function analyzeRefStyle(){
+  const analyzeBox = document.getElementById('ref-analyzing');
+  const resultBox  = document.getElementById('ref-style-result');
+  const resultText = document.getElementById('ref-style-text');
+
+  analyzeBox.style.display = 'flex';
+  resultBox.style.display  = 'none';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 300,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: refImageMime, data: refImageBase64 }
+            },
+            {
+              type: 'text',
+              text: `Analyze this image and extract its visual style for AI image/video generation prompts.
+Return ONLY a concise comma-separated style description (max 40 words) covering:
+- Lighting style (e.g. golden hour, harsh shadows, soft diffused)
+- Color palette (e.g. warm tones, desaturated, high contrast)
+- Cinematography style (e.g. anamorphic, film grain, shallow depth of field)
+- Overall mood/aesthetic (e.g. cinematic, documentary, noir)
+No explanation. Just the style tags.`
+            }
+          ]
+        }]
+      })
+    });
+    const json = await res.json();
+    if(json.error) throw new Error(json.error.message);
+
+    refStyleText = (json.content||[]).map(c=>c.text||'').join('').trim();
+
+    resultText.textContent = refStyleText;
+    resultBox.style.display = '';
+    updateRefBadge();
+
+    // Also merge into the style input field
+    const curStyle = document.getElementById('style').value.trim();
+    if(refStyleText && !curStyle.includes(refStyleText.slice(0,20))){
+      document.getElementById('style').value = refStyleText + (curStyle ? ', ' + curStyle : '');
+    }
+
+  } catch(err){
+    refStyleText = null;
+    resultText.textContent = 'Style বিশ্লেষণ করা যায়নি। তবে Generate-এ ছবিটি ব্যবহার হবে।';
+    resultBox.style.display = '';
+  } finally {
+    analyzeBox.style.display = 'none';
+  }
+}
+
+function removeRefImage(){
+  refImageBase64 = null;
+  refImageMime   = null;
+  refStyleText   = null;
+  document.getElementById('ref-preview-box').style.display  = 'none';
+  document.getElementById('ref-dropzone').style.display     = '';
+  document.getElementById('ref-style-result').style.display = 'none';
+  document.getElementById('ref-img-input').value            = '';
+  // Reset style field to default chips
+  const active = [...document.querySelectorAll('#style-chips .chip.on')].map(e=>e.textContent.toLowerCase());
+  document.getElementById('style').value = active.join(', ') || 'cinematic, photorealistic, 4k';
+  // Sync badge
+  updateRefBadge();
+}
+
+
+async function generate(){
+  const script = document.getElementById('script').value.trim();
+  if(!script){ showErr('স্ক্রিপ্ট খালি রাখা যাবে না।'); return; }
+
+  const niche  = document.getElementById('niche').value.trim() || 'সাধারণ সিনেমাটিক';
+  const style  = document.getElementById('style').value.trim() || 'cinematic, photorealistic, 4k';
+  const genCh  = document.getElementById('v-char').value === 'true';
+  const genVO  = document.getElementById('v-vo').value === 'true';
+
+  const { words, durSec, durFmt, secPerScene, scenes } = calcScenes();
+  const wpm = parseInt(document.getElementById('wpm-range').value) || 130;
+
+  showErr('');
+  const refMsg = refImageBase64 ? ' · 🖼 Ref' : '';
+  setLoading(true, `⚡ Claude-এ পাঠানো হচ্ছে${refMsg}...`);
+
+  // ── Compact camera library ──
+  const CAM_LIB = [
+    '1.Slow Dolly In|SLOW DOLLY IN - glides forward, intimacy/tension',
+    '2.Slow Dolly Out|SLOW DOLLY OUT - tracks back, reveals scale/isolation',
+    '3.Fast Dolly In|FAST DOLLY IN RUSH - surges forward, urgency/shock',
+    '4.Vertigo Zoom|DOLLY ZOOM - dolly back+zoom in, disorientation',
+    '5.Macro Zoom|EXTREME MACRO ZOOM - pushes into microscopic detail',
+    '6.Hyper Zoom|COSMIC HYPER-ZOOM - races from space to subject',
+    '7.OTS Shot|OVER-THE-SHOULDER - secondary foreground, primary framed',
+    '8.Fisheye|FISHEYE LENS - ultra-wide distortion, paranoia',
+    '9.Wipe Reveal|LATERAL WIPE REVEAL - foreground slides to unveil subject',
+    '10.Fly-Through|FLY THROUGH - glides through opening to reveal beyond',
+    '11.Focus Pull|FOCUS-PULL REVEAL - opens blurred, snaps to clarity',
+    '12.Rack Focus|RACK FOCUS - shifts focus foreground to background',
+    '13.Tilt Up|SLOW TILT UP - boots to face, authority/reverence',
+    '14.Tilt Down|SLOW TILT DOWN - face to boots, humility',
+    '15.Truck Left|TRUCK LEFT - lateral glide left, scanning',
+    '16.Truck Right|TRUCK RIGHT - lateral glide right, panoramic',
+    '17.Orbit 180|HALF ORBIT - smooth 180 arc around subject',
+    '18.Fast 360|FAST 360 ORBIT - full spin, battle climax/power',
+    '19.Slow Arc|SLOW CINEMATIC ARC - gentle wide curve, prayer/contemplation',
+    '20.Pedestal Down|PEDESTAL DOWN - camera lowers, sadness/defeat',
+    '21.Pedestal Up|PEDESTAL UP - camera rises, hope/resurrection',
+    '22.Crane Up|CRANE UP - rises to high-angle, departures/deaths',
+    '23.Crane Down|CRANE DOWN - aerial to eye-level, arrivals/angels',
+    '24.Zoom In|SMOOTH OPTICAL ZOOM IN - lens advances, silent emotion',
+    '25.Zoom Out|SMOOTH OPTICAL ZOOM OUT - lens pulls wide, bigger picture',
+    '26.Snap Zoom|SNAP ZOOM CRASH - aggressive punch to eyes, shock/betrayal',
+    '27.Drone Flyover|HIGH-ALTITUDE DRONE FLYOVER - aerial push over landscape',
+    '28.Epic Drone|EPIC DRONE REVEAL - rises from ridge, grand entrance',
+    '29.Drone Orbit|WIDE DRONE ORBIT - aerial circle, sacred sites/battles',
+    '30.Gods Eye|TOP-DOWN DRONE 90deg - overhead rotating, divine perspective',
+    '31.FPV Dive|FPV DRONE DIVE - aggressive plunge, battle charges',
+    '32.Handheld|HANDHELD CAMERA - micro-jitters/sway, grief/chaos',
+    '33.Whip Pan|WHIP PAN - lateral snap with blur, fast transitions',
+    '34.Dutch Angle|DUTCH ANGLE - diagonal frame tilt, evil/unease',
+    '35.Leading Shot|BACKWARD TRACKING LEAD - retreats as character walks to fate',
+    '36.Following Shot|FORWARD TRACKING FOLLOW - advances behind subject',
+    '37.Side Track|SIDE-TRACKING PARALLEL - locked profile lateral, processions',
+    '38.POV Walk|FIRST-PERSON POV WALK - step bob/sway, immersive entry',
+    '39.Push Foreground|PUSH THROUGH FOREGROUND - advances through layered elements',
+    '40.Shadow Reveal|SHADOW REVEAL - shadow first then figure, villain/mystery',
+    '41.Reflection|REFLECTION FRAMING - seen through mirror/water, self-reflection',
+    '42.Split Diopter|SPLIT DIOPTER - fore+background both sharp, conflict',
+    '43.Slow Breathe|SLOW ZOOM + FOCUS BREATHING - organic realism, silent prayer',
+    '44.Slow Roll|SLOW ROLL - axis rotation, supernatural events',
+    '45.Extreme Wide|EXTREME WIDE STATIC - locked far shot, solitude/exile',
+    '46.Foreground Whip|FOREGROUND WHIP PASS - fast object wipes frame',
+    '47.Light Bloom|SLOW PUSH + LIGHT BLOOM - gentle push with glowing highlights, angels/divine',
+    '48.Frame-In|FRAME-IN COMPOSITION - subject framed by environment, archways',
+    '49.Telephoto|TELEPHOTO COMPRESSION - long lens compresses depth, crowds/armies',
+    '50.Silhouette Push|PUSH INTO SILHOUETTE - advances as subject darkens, martyrdom/farewell'
+  ].join('\n');
+
+  const ISLAMIC_RULES = `Islamic rules: Prophet=white robe+face in bright white noor light; Angel=large white wings+face white light; Muslim woman=loose black abaya fully covered eyes only; Muslim man=modest Shariah clothing face visible; Non-Muslim=own cultural dress normal face. Video: NO shake/narration/mouth sounds. Natural ambient only(wind/steps/fabric/water/fire). Body moves naturally. ALIVE. CHARACTER CONSISTENCY: once defined reuse EXACT same visual.`;
+
+  // ── Reference image content block ──
+  const refBlock = (refImageBase64 && refImageMime)
+    ? [{ type:'image', source:{ type:'base64', media_type:refImageMime, data:refImageBase64 } }]
+    : [];
+  const refNote = refImageBase64
+    ? `REFERENCE IMAGE ATTACHED: Apply its exact lighting, color palette, cinematography and mood to ALL prompts.${refStyleText?' Style: '+refStyleText:''}\n`
+    : '';
+
+  // ══════════════════════════════════════════
+  // CALL 1 — Scenes only (main, big call)
+  // CALL 2 — Chars + VO (parallel if needed)
+  // Both fire at the same time with Promise.all
+  // ══════════════════════════════════════════
+
+  const SCENE_SYS = `You are a professional AI visual prompt engineer for Islamic cinematic storytelling.
+${ISLAMIC_RULES}
+CAMERA MOVES (name|instruction):
+${CAM_LIB}
+OUTPUT: ONLY valid JSON — no markdown, no extra text.
+{"scenes":[{"id":1,"originalLine":"exact script words","cameraMove":"name","cameraPrompt":"instruction","imagePrompt":"detailed static prompt","videoPrompt":"imagePrompt+cameraPrompt+motion+ambientSounds"}]}`;
+
+  const SCENE_USER = `${refNote}Script:\n"""\n${script}\n"""\nGenre:${niche}|Style:${style}|Ratio:${ratio}|Model:${model}(${secPerScene}s/scene)|Words:${words}|Duration:${durFmt}|SCENES:EXACTLY ${scenes}\nRules: EXACTLY ${scenes} scenes. originalLine=exact words. imagePrompt includes subject+clothing+environment+lighting+angle+${style}+${ratio}. videoPrompt=imagePrompt+cameraPrompt+motion+ambientSounds for ${model} ${secPerScene}s. Return ONLY valid JSON.`;
+
+  const EXTRA_SYS = `You are a professional screenwriter and character designer for Islamic cinematic content.${ISLAMIC_RULES} Return ONLY valid JSON, no markdown.`;
+  const EXTRA_USER = `Script:\n"""\n${script}\n"""\nGenre:${niche}|Style:${style}
+${genCh ? 'List all characters with full visual consistency prompts.' : '"characters":[]'}
+${genVO ? 'Write complete formatted voiceover script.' : '"voiceoverScript":""'}
+Return ONLY: {"characters":[{"name":"","description":"","consistencyPrompt":""}],"voiceoverScript":""}`;
+
+  const callApi = (sys, userContent, maxTok) =>
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: maxTok,
+        system: sys,
+        messages: [{ role:'user', content: userContent }]
+      })
+    });
+
+  const sceneContent = [
+    ...refBlock,
+    { type:'text', text: SCENE_USER }
+  ];
+
+  // Only fire extras call if needed
+  const needExtras = genCh || genVO;
+
+  try {
+    // Fire both calls in parallel
+    const promises = [ callApi(SCENE_SYS, sceneContent, 6000) ];
+    if (needExtras) promises.push( callApi(EXTRA_SYS, [{ type:'text', text: EXTRA_USER }], 2000) );
+
+    setLoading(true, `🎬 ${scenes}টি scene তৈরি হচ্ছে${needExtras ? ' · চরিত্র ও VO' : ''}...`);
+
+    const responses = await Promise.all(promises);
+
+    // Check HTTP errors
+    for (let i = 0; i < responses.length; i++) {
+      if (!responses[i].ok) {
+        const t = await responses[i].text();
+        throw new Error('API Error ' + responses[i].status + ': ' + t.slice(0, 200));
+      }
+    }
+
+    const jsons = await Promise.all(responses.map(r => r.json()));
+    for (const j of jsons) {
+      if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));
+    }
+
+    setLoading(true, '✅ ফলাফল সাজানো হচ্ছে...');
+
+    const extract = (j) => {
+      const raw = (j.content || []).map(c => c.text || '').join('');
+      const m = raw.replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'').trim().match(/\{[\s\S]*\}/);
+      if (!m) throw new Error('JSON খুঁজে পাওয়া যায়নি।');
+      return JSON.parse(m[0]);
+    };
+
+    const sceneData  = extract(jsons[0]);
+    const extraData  = needExtras ? extract(jsons[1]) : {};
+
+    data = {
+      scenes:    sceneData.scenes    || [],
+      chars:     extraData.characters || [],
+      voiceover: extraData.voiceoverScript || ''
+    };
+
+    if (!data.scenes.length) throw new Error('কোনো scene তৈরি হয়নি। আবার চেষ্টা করুন।');
+
+    // ── Save to history ──
+    histAdd({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      ts: Date.now(),
+      script: script,
+      niche:  niche,
+      style:  style,
+      ratio:  ratio,
+      model:  model,
+      hasRef: !!refImageBase64,
+      sceneCount: data.scenes.length,
+      charCount:  data.chars.length,
+      scenes:     data.scenes,
+      chars:      data.chars,
+      voiceover:  data.voiceover
+    });
+
+    render();
+    setLoading(false);
+  } catch(err) {
+    showErr('❌ ' + err.message);
+    setLoading(false);
+  }
+}
+
+// ─── RENDER ─────────────────────────────────────────
+function render(){
+  document.getElementById('empty-out').style.display = 'none';
+  document.getElementById('out-content').style.display = '';
+
+  document.getElementById('sn-cnt').textContent = data.scenes.length;
+  document.getElementById('sc-badge').textContent = data.scenes.length;
+  document.getElementById('ch-cnt').textContent = data.chars.length;
+
+  // Show duration summary in output
+  const { durFmt, secPerScene } = calcScenes();
+  const durEl = document.getElementById('out-dur-info');
+  if(durEl){
+    const refBadge = refImageBase64 ? ' · 🖼 Ref style applied' : '';
+    durEl.textContent = `${model} · ${secPerScene}s/scene · ${durFmt} · ${data.scenes.length} scenes${refBadge}`;
+  }
+
+  // SCENES
+  const sl = document.getElementById('scenes-list');
+  sl.innerHTML = '';
+  data.scenes.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'scene-card';
+    div.style.animationDelay = (i * 0.04) + 's';
+    div.innerHTML = `
+      <div class="sc-head">
+        <span class="sc-num">SCENE ${s.id || i+1}</span>
+        ${s.cameraMove ? `<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:6px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;flex-shrink:0;">🎬 ${escHtml(s.cameraMove)}</span>` : ''}
+        <span class="sc-orig">${escHtml(s.originalLine || '')}</span>
+      </div>
+      ${s.cameraPrompt ? `
+      <div style="margin:0 18px 0;padding:10px 14px;background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.15);border-radius:11px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+        <div style="font-family:var(--mono);font-size:11px;color:#6ee7b7;line-height:1.55;flex:1;">${escHtml(s.cameraPrompt)}</div>
+        <button class="copy-btn" style="color:#10b981;border-color:#10b981;flex-shrink:0;margin-top:1px;" data-cam="${escAttr(s.cameraPrompt)}">Copy</button>
+      </div>` : ''}
+      <div class="sc-body">
+        <div class="prompt-box img-box">
+          <div class="pb-label">
+            <span>📷 Image Prompt</span>
+            <button class="copy-btn" data-text="${escAttr(s.imagePrompt || '')}">Copy</button>
+          </div>
+          <div class="pb-text">${escHtml(s.imagePrompt || '')}</div>
+        </div>
+        <div class="prompt-box vid-box">
+          <div class="pb-label">
+            <span>🎥 Video Prompt</span>
+            <button class="copy-btn" data-text="${escAttr(s.videoPrompt || '')}">Copy</button>
+          </div>
+          <div class="pb-text">${escHtml(s.videoPrompt || '')}</div>
+        </div>
+      </div>`;
+    sl.appendChild(div);
+  });
+
+  // attach copy events — both data-text and data-cam buttons
+  sl.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', function(){
+      const txt = this.getAttribute('data-text') || this.getAttribute('data-cam') || '';
+      copyToClipboard(txt, this);
+    });
+  });
+
+  // CHARS
+  const cl = document.getElementById('chars-list');
+  cl.innerHTML = '';
+  if(!data.chars.length){
+    cl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:20px">কোনো চরিত্র তৈরি হয়নি বা অপশন বন্ধ আছে।</div>';
+  } else {
+    data.chars.forEach((c, i) => {
+      const d = document.createElement('div');
+      d.className = 'char-card';
+      d.style.animationDelay = (i*0.05)+'s';
+      d.innerHTML = `
+        <div class="char-name">${escHtml(c.name||'')}</div>
+        <div class="char-desc">${escHtml(c.description||'')}</div>
+        <div class="char-prompt">${escHtml(c.consistencyPrompt||c.prompt||'')}</div>
+        <div style="margin-top:10px">
+          <button class="copy-btn img-box" style="border-color:var(--accent2);color:var(--accent2)"
+            data-text="${escAttr(c.consistencyPrompt||c.prompt||'')}">Copy Prompt</button>
+        </div>`;
+      d.querySelector('.copy-btn').addEventListener('click', function(){
+        copyToClipboard(this.getAttribute('data-text'), this);
+      });
+      cl.appendChild(d);
+    });
+  }
+
+  // VOICEOVER
+  document.getElementById('vo-box').textContent = data.voiceover || 'ভয়েসওভার তৈরি হয়নি বা অপশন বন্ধ আছে।';
+
+  switchTab('scenes');
+}
+
+// ─── TAB SWITCH ─────────────────────────────────────
+function switchTab(t){
+  ['scenes','chars','vo'].forEach(x => {
+    document.getElementById('tab-'+x).style.display = x===t ? '' : 'none';
+  });
+  document.querySelectorAll('.rtab').forEach((b,i) => {
+    b.classList.toggle('on', ['scenes','chars','vo'][i] === t);
+  });
+}
+
+// ─── COPY FUNCTIONS ─────────────────────────────────
+function copyToClipboard(text, btn){
+  if(!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    if(btn){
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('ok');
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove('ok'); }, 2000);
+    }
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    if(btn){
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('ok');
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove('ok'); }, 2000);
+    }
+  });
+}
+
+function copyAllImg(){
+  const txt = data.scenes.map((s,i)=>`SCENE ${s.id||i+1} — Image Prompt:\n${s.imagePrompt}`).join('\n\n---\n\n');
+  copyToClipboard(txt);
+  alert(`${data.scenes.length}টি Image Prompt কপি হয়েছে!`);
+}
+function copyAllVid(){
+  const txt = data.scenes.map((s,i)=>`SCENE ${s.id||i+1} — Video Prompt:\n${s.videoPrompt}`).join('\n\n---\n\n');
+  copyToClipboard(txt);
+  alert(`${data.scenes.length}টি Video Prompt কপি হয়েছে!`);
+}
+function copyAllBoth(){
+  const txt = data.scenes.map((s,i)=>
+    `SCENE ${s.id||i+1}\nOriginal: ${s.originalLine}\n🎬 Camera: ${s.cameraMove||'—'}\n📐 Camera Prompt: ${s.cameraPrompt||'—'}\n\n📷 Image Prompt:\n${s.imagePrompt}\n\n🎥 Video Prompt:\n${s.videoPrompt}`
+  ).join('\n\n════════════════════\n\n');
+  copyToClipboard(txt);
+  alert('সব Prompt (Camera + Image + Video) কপি হয়েছে!');
+}
+function copyAllChars(){
+  const txt = data.chars.map(c=>`${c.name}:\n${c.consistencyPrompt||c.prompt}`).join('\n\n---\n\n');
+  copyToClipboard(txt);
+  alert('সব Character Prompt কপি হয়েছে!');
+}
+function copyVO(){
+  copyToClipboard(data.voiceover);
+  alert('Voiceover স্ক্রিপ্ট কপি হয়েছে!');
+}
+
+// ─── HELPERS ────────────────────────────────────────
+function showErr(msg){
+  const e = document.getElementById('errbox');
+  e.style.display = msg ? '' : 'none';
+  e.textContent = msg;
+}
+function setLoading(on, msg=''){
+  const btn = document.getElementById('genbtn');
+  btn.disabled = on;
+  btn.textContent = on ? '⏳ তৈরি হচ্ছে...' : '✦ Prompt তৈরি করুন';
+  document.getElementById('progwrap').style.display = on ? '' : 'none';
+  if(msg) document.getElementById('progmsg').textContent = msg;
+}
+
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s){ return s.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+
+
+
+// ─── GOOGLE AUTH ─────────────────────────────────
+let authDropdownOpen = false;
+let _authReady = false;
+
+window.onAuthReady = async function(user){
+  _authReady = true;
+  if(user){
+    // Update UI — signed in
+    document.getElementById('auth-signin-btn').style.display  = 'none';
+    document.getElementById('auth-profile-wrap').style.display = '';
+    document.getElementById('auth-display-name').textContent  = user.displayName?.split(' ')[0] || 'User';
+    document.getElementById('auth-full-name').textContent     = user.displayName || 'User';
+    document.getElementById('auth-email').textContent         = user.email || '';
+    // Avatar — photo or initial
+    const av = document.getElementById('auth-avatar');
+    if(user.photoURL){
+      av.innerHTML = `<img src="${user.photoURL}" alt="">`;
+    } else {
+      av.textContent = (user.displayName||'U')[0].toUpperCase();
+    }
+    // Load user's cloud history
+    await refreshHistory();
+    checkRestoreBanner();
+  } else {
+    // Signed out
+    document.getElementById('auth-signin-btn').style.display  = '';
+    document.getElementById('auth-profile-wrap').style.display = 'none';
+    _cachedHistory = localLoad();
+    renderHistory();
+  }
+};
+
+function isFbConfigured(){
+  // Check if user replaced the demo keys
+  const auth = window._fbAuth;
+  if(!auth) return false;
+  const key = auth.app?.options?.apiKey || '';
+  return !key.includes('DEMO_REPLACE');
+}
+
+async function authSignIn(){
+  if(!window._fbFns){ showFbNotice(); return; }
+  if(!isFbConfigured()){ showFbNotice(); return; }
+  try{
+    await window._fbFns.signInWithPopup(window._fbAuth, window._fbProvider);
+  } catch(e){
+    if(e.code !== 'auth/popup-closed-by-user')
+      alert('Login error: ' + e.message);
+  }
+}
+
+async function authSignOut(){
+  toggleAuthDropdown();
+  try{ await window._fbFns.signOut(window._fbAuth); }
+  catch(e){ console.warn(e); }
+}
+
+function toggleAuthDropdown(){
+  authDropdownOpen = !authDropdownOpen;
+  document.getElementById('auth-dropdown').classList.toggle('open', authDropdownOpen);
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  if(authDropdownOpen && !document.getElementById('auth-profile-wrap')?.contains(e.target)){
+    authDropdownOpen = false;
+    document.getElementById('auth-dropdown')?.classList.remove('open');
+  }
+});
+
+function showFbNotice(){
+  const n = document.getElementById('fb-notice');
+  if(n){ n.style.display='flex'; setTimeout(()=>n.style.display='none', 7000); }
+}
+
+// ─── HISTORY DRAWER TOGGLE ────────────────────────
+let histDrawerOpen = false;
+function toggleHistoryPanel(){
+  histDrawerOpen = !histDrawerOpen;
+  const drawer   = document.getElementById('hist-drawer');
+  const backdrop = document.getElementById('hist-backdrop');
+  const btn      = document.getElementById('hist-toggle-btn');
+  drawer.style.transform   = histDrawerOpen ? 'translateX(0)' : 'translateX(-100%)';
+  backdrop.style.opacity   = histDrawerOpen ? '1' : '0';
+  backdrop.style.pointerEvents = histDrawerOpen ? 'auto' : 'none';
+  btn.style.borderColor    = histDrawerOpen ? 'rgba(124,106,247,.5)' : 'var(--border)';
+  btn.style.color          = histDrawerOpen ? 'var(--accent2)' : 'var(--text-dim)';
+}
+
+// ─── HISTORY — Firebase (signed in) + localStorage (guest) ─────
+const HIST_KEY  = 'aips_history_v1';
+const HIST_MAX  = 50;
+
+// ── Local (guest) helpers ──
+function localLoad(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch{ return []; } }
+function localSave(arr){ try{ localStorage.setItem(HIST_KEY, JSON.stringify(arr)); }catch{} }
+
+// ── Firestore helpers ──
+async function fbHistLoad(){
+  try{
+    const user = window._fbUser; if(!user) return null;
+    const { getDocs, collection, query, orderBy, limit } = window._fbFns;
+    const db = window._fbDb;
+    const q  = query(collection(db,'users',user.uid,'history'), orderBy('ts','desc'), limit(HIST_MAX));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data());
+  }catch(e){ console.warn('Firestore load:', e); return null; }
+}
+
+async function fbHistAdd(entry){
+  try{
+    const user = window._fbUser; if(!user) return false;
+    const { doc, setDoc, collection } = window._fbFns;
+    const db = window._fbDb;
+    // strip large scene data to keep Firestore doc < 1MB
+    const lite = {...entry, scenes: entry.scenes.map(s=>({
+      id:s.id, originalLine:s.originalLine, cameraMove:s.cameraMove,
+      imagePrompt:(s.imagePrompt||'').slice(0,600),
+      videoPrompt:(s.videoPrompt||'').slice(0,600),
+      cameraPrompt:(s.cameraPrompt||'').slice(0,300)
+    }))};
+    await setDoc(doc(db,'users',user.uid,'history',entry.id), lite);
+    return true;
+  }catch(e){ console.warn('Firestore add:', e); return false; }
+}
+
+async function fbHistDelete(id){
+  try{
+    const user = window._fbUser; if(!user) return;
+    const { doc, deleteDoc } = window._fbFns;
+    await deleteDoc(doc(window._fbDb,'users',user.uid,'history',id));
+  }catch(e){ console.warn('Firestore del:', e); }
+}
+
+async function fbHistClear(){
+  try{
+    const user = window._fbUser; if(!user) return;
+    const { getDocs, collection, query, writeBatch, doc } = window._fbFns;
+    const db = window._fbDb;
+    const snap = await getDocs(collection(db,'users',user.uid,'history'));
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(doc(db,'users',user.uid,'history',d.id)));
+    await batch.commit();
+  }catch(e){ console.warn('Firestore clear:', e); }
+}
+
+// ── Unified API ──
+async function histAdd(entry){
+  if(window._fbUser){
+    await fbHistAdd(entry);
+    await refreshHistory();
+  } else {
+    const arr = localLoad();
+    arr.unshift(entry);
+    if(arr.length > HIST_MAX) arr.splice(HIST_MAX);
+    localSave(arr);
+    renderHistory();
+  }
+}
+
+async function histDelete(id){
+  if(window._fbUser){
+    await fbHistDelete(id);
+    await refreshHistory();
+  } else {
+    localSave(localLoad().filter(e=>e.id!==id));
+    renderHistory();
+  }
+}
+
+async function clearAllHistory(){
+  if(!confirm('সব history মুছে ফেলবেন?')) return;
+  if(window._fbUser){
+    await fbHistClear();
+    await refreshHistory();
+  } else {
+    localSave([]);
+    renderHistory();
+  }
+}
+
+// ── Load & refresh ──
+let _cachedHistory = [];
+async function refreshHistory(){
+  if(window._fbUser){
+    const remote = await fbHistLoad();
+    _cachedHistory = remote !== null ? remote : localLoad();
+  } else {
+    _cachedHistory = localLoad();
+  }
+  renderHistory();
+}
+
+function histLoad(){ return _cachedHistory; }
+
+function renderHistory(){
+  const arr = histLoad();
+  const grid = document.getElementById('hist-grid');
+  const cnt  = document.getElementById('hist-count');
+  const clrBtn = document.getElementById('hist-clear-btn');
+  const navCnt = document.getElementById('hist-nav-count');
+
+  cnt.textContent = arr.length;
+  if(navCnt){ navCnt.textContent = arr.length; navCnt.style.display = arr.length ? '' : 'none'; }
+  if(clrBtn) clrBtn.style.display = arr.length ? '' : 'none';
+
+  if(!arr.length){
+    grid.innerHTML = '<div class="hist-empty"><div class="hist-empty-icon">🕓</div>এখনো কোনো generation নেই</div>';
+    return;
+  }
+
+  grid.innerHTML = '';
+  arr.forEach(entry => {
+    const card = document.createElement('div');
+    card.className = 'hist-card';
+    const dt = new Date(entry.ts);
+    const timeStr = dt.toLocaleDateString('bn-BD',{day:'2-digit',month:'short',year:'numeric'}) + ' · ' +
+                    dt.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+    const preview = (entry.script||'').slice(0,120).replace(/\n/g,' ');
+
+    card.innerHTML = `
+      <div class="hist-card-top">
+        <div class="hist-card-meta">
+          <span class="hist-time">${timeStr}</span>
+          <div class="hist-badges">
+            <span class="hist-badge hb-model">${escHtml(entry.model||'')}</span>
+            <span class="hist-badge hb-scenes">${entry.sceneCount||0} scenes</span>
+            ${entry.hasRef ? '<span class="hist-badge hb-ref">🖼 Ref</span>' : ''}
+          </div>
+        </div>
+        <div class="hist-script-preview">${escHtml(preview)}${entry.script&&entry.script.length>120?'…':''}</div>
+      </div>
+      <div class="hist-card-bottom">
+        <div class="hist-stats">
+          <div class="hist-stat">Niche: <span>${escHtml(entry.niche||'-')}</span></div>
+          <div class="hist-stat">Ratio: <span>${escHtml(entry.ratio||'-')}</span></div>
+          <div class="hist-stat">Chars: <span>${entry.charCount||0}</span></div>
+        </div>
+        <button class="hist-del" onclick="event.stopPropagation();histDelete('${entry.id}')" title="মুছুন">✕</button>
+      </div>`;
+
+    card.addEventListener('click', () => loadFromHistory(entry));
+    grid.appendChild(card);
+  });
+}
+
+function loadFromHistory(entry){
+  // Restore data and render output
+  data = { scenes: entry.scenes||[], chars: entry.chars||[], voiceover: entry.voiceover||'' };
+
+  // Restore inputs
+  document.getElementById('script').value = entry.script || '';
+  document.getElementById('niche').value  = entry.niche  || '';
+  document.getElementById('style').value  = entry.style  || '';
+  // Restore model & ratio
+  if(entry.model) setModel(entry.model);
+  if(entry.ratio){
+    document.querySelectorAll('.rbtn').forEach(b => {
+      b.classList.toggle('on', b.textContent === entry.ratio);
+    });
+    ratio = entry.ratio;
+  }
+  updateStats();
+
+  // Render output
+  render();
+
+  // Scroll to output
+  document.getElementById('out-panel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ─── RESTORE LAST SESSION BANNER ─────────────────
+function checkRestoreBanner(){
+  const arr = histLoad();
+  if(!arr.length) return;
+  const last = arr[0];
+  const age = Date.now() - (last.ts||0);
+  // Show if last session was < 24h ago and page was just loaded
+  if(age < 86400000){
+    const banner = document.getElementById('restore-banner');
+    banner.style.display = 'flex';
+    setTimeout(() => { banner.style.display = 'none'; }, 8000);
+  }
+}
+
+function restoreLastSession(){
+  const arr = histLoad();
+  if(arr.length) loadFromHistory(arr[0]);
+  document.getElementById('restore-banner').style.display = 'none';
+}
+
+function dismissRestoreBanner(){
+  document.getElementById('restore-banner').style.display = 'none';
+}
+
+
+updateStats();
+// history + auth loaded via onAuthReady callback
+if(!window._fbFns){ _cachedHistory=localLoad(); renderHistory(); checkRestoreBanner(); }
+</script>
+</body>
+</html>
